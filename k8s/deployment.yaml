@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sre-app-deployment
+  labels:
+    app: sre-app
+spec:
+  replicas: 2 # SRE Best Practice: Run at least 2 copies for high availability
+  selector:
+    matchLabels:
+      app: sre-app
+  template:
+    metadata:
+      labels:
+        app: sre-app
+    spec:
+      containers:
+      - name: java-service
+        image: sre-app:latest # We will replace this with your real AWS ECR path later
+        ports:
+        - containerPort: 8080
+        
+        # SRE Best Practice: Define explicit boundary guardrails to prevent noisy neighbors
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1024Mi"  # The JVM container configuration will respect this 1GB limit
+            cpu: "500m"
+
+        # SRE Best Practice: Define status health checks so K8s handles self-healing automatically
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30 # Gives the JVM 30 seconds to boot up smoothly
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sre-app-service
+spec:
+  type: ClusterIP # Exposes the service internally inside the Kubernetes cluster network
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: sre-app
+
